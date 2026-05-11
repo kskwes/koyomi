@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>今日の暦</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="season-bar"></div>
+
+  <div class="container">
+    <header>
+      <p class="date-wareki" id="date-wareki"></p>
+      <h1 class="date-main" id="date-main"></h1>
+      <p class="date-month-name" id="date-month-name"></p>
+    </header>
+
+    <main>
+      <section class="card" id="sekki-card">
+        <div class="card-header">
+          <span class="card-label">二十四節気</span>
+        </div>
+        <div class="card-body">
+          <div class="main-term">
+            <span class="term-name" id="sekki-name"></span>
+            <span class="term-reading" id="sekki-reading"></span>
+          </div>
+          <p class="term-period" id="sekki-period"></p>
+          <p class="term-desc" id="sekki-desc"></p>
+          <div class="term-nav" id="sekki-nav"></div>
+        </div>
+      </section>
+
+      <section class="card" id="kiko-card">
+        <div class="card-header">
+          <span class="card-label">七十二候</span>
+        </div>
+        <div class="card-body">
+          <div class="main-term">
+            <span class="term-name" id="kiko-name"></span>
+            <span class="term-reading" id="kiko-reading"></span>
+          </div>
+          <p class="term-period" id="kiko-period"></p>
+          <p class="term-desc" id="kiko-desc"></p>
+          <div class="term-nav" id="kiko-nav"></div>
+        </div>
+      </section>
+
+      <section class="card" id="kigo-card">
+        <div class="card-header">
+          <span class="card-label">今日の季語</span>
+          <span class="card-meta" id="kigo-updated"></span>
+        </div>
+        <div id="kigo-content">
+          <div class="loading">
+            <span class="loading-text">季語を探しています</span>
+            <span class="loading-dots"><span></span><span></span><span></span></span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>節気・候の日付は目安です。年によって1〜2日前後します。</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
