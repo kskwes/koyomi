@@ -3,9 +3,9 @@
 //  Google Cloud Console で HTTP リファラー制限を
 //  かけることでキーの不正利用を防げます
 // =============================================
-const GEMINI_API_KEY = 'AIzaSyAhqfU5Sw2EFKURNW4lAyLxLd7xF5AGGcA';
+const GEMINI_API_KEY = 'YOUR_GEMINI_API_KEY';
 
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 const CACHE_KEY = 'koyomi_kigo_cache';
 
 // =============================================
@@ -237,10 +237,16 @@ ${kiko.description}
     }),
   });
 
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw new Error(`HTTP ${res.status}: ${errBody}`);
+  }
 
   const data = await res.json();
+  console.log('Gemini response:', JSON.stringify(data, null, 2));
+
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  if (!text) throw new Error(`レスポンスにテキストがありません: ${JSON.stringify(data)}`);
 
   // マークダウンのコードブロックがある場合は除去
   const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -311,9 +317,10 @@ function renderKigo(kigoList, updatedDate) {
   content.innerHTML = `<div class="card-body"><div class="kigo-list">${html}</div></div>`;
 }
 
-function renderKigoError() {
+function renderKigoError(detail = '') {
   const content = document.getElementById('kigo-content');
-  content.innerHTML = `<div class="card-body"><p class="error-msg">季語の取得に失敗しました。<br>APIキーの設定をご確認いただくか、しばらくしてから再度お試しください。</p></div>`;
+  const detailHtml = detail ? `<br><small style="font-size:0.7rem;opacity:0.7;">${detail}</small>` : '';
+  content.innerHTML = `<div class="card-body"><p class="error-msg">季語の取得に失敗しました。<br>APIキーをご確認いただくか、しばらくしてから再度お試しください。${detailHtml}</p></div>`;
 }
 
 // =============================================
@@ -355,7 +362,7 @@ async function init() {
     renderKigo(kigo, todayStr);
   } catch (err) {
     console.error('Kigo fetch error:', err);
-    renderKigoError();
+    renderKigoError(err.message);
   }
 }
 
