@@ -445,6 +445,158 @@ function renderKigo(kigoList) {
 }
 
 // =============================================
+//  月の暦データ・ロジック
+// =============================================
+const SYNODIC_PERIOD   = 29.53059;
+const KNOWN_NEW_MOON_MS = Date.UTC(2000, 0, 6, 18, 14); // 2000-01-06 18:14 UTC
+
+const MOON_NAMES = [
+  { max:  1.0, name: '新月',   reading: 'しんげつ' },
+  { max:  3.5, name: '繊月',   reading: 'せんげつ' },
+  { max:  5.5, name: '三日月', reading: 'みかづき' },
+  { max:  8.5, name: '上弦前', reading: 'じょうげんまえ' },
+  { max: 10.0, name: '上弦',   reading: 'じょうげん' },
+  { max: 12.5, name: '十日夜', reading: 'とおかんや' },
+  { max: 14.5, name: '十三夜', reading: 'じゅうさんや' },
+  // 満月は getMoonNameForDay() のピーク検出でのみ返す
+  { max: 16.0, name: '十六夜', reading: 'いざよい' },    // 16日目 満月翌日
+  { max: 17.0, name: '立待月', reading: 'たちまちづき' }, // 17日目
+  { max: 18.0, name: '居待月', reading: 'いまちづき' },   // 18日目
+  { max: 19.0, name: '臥待月', reading: 'ふしまちづき' }, // 19日目
+  { max: 22.0, name: '更待月', reading: 'ふけまちづき' }, // 20〜22日目（固有名なし）
+  { max: 25.5, name: '下弦',   reading: 'かげん' },
+  { max: 28.0, name: '有明月', reading: 'ありあけづき' },
+  { max: 30.0, name: '晦日月', reading: 'みそかづき' },
+];
+
+function getMoonAge(date) {
+  const days = (date.getTime() - KNOWN_NEW_MOON_MS) / 86400000;
+  return ((days % SYNODIC_PERIOD) + SYNODIC_PERIOD) % SYNODIC_PERIOD;
+}
+
+function getMoonName(age) {
+  for (const m of MOON_NAMES) {
+    if (age < m.max) return m;
+  }
+  return MOON_NAMES[MOON_NAMES.length - 1];
+}
+
+// 表示ラベル：満月・新月・半月はピーク検出、三日月は月齢範囲で判定
+function getMoonPhaseLabel(date) {
+  const start = new Date(date); start.setHours(0, 0, 0, 0);
+  const end   = new Date(date); end.setHours(23, 59, 59, 0);
+  const a0 = getMoonAge(start);
+  const a1 = getMoonAge(end);
+  const FULL    = SYNODIC_PERIOD / 2;
+  const FIRST_Q = SYNODIC_PERIOD / 4;
+  const LAST_Q  = SYNODIC_PERIOD * 3 / 4;
+
+  if (a1 < a0)                         return '新月';
+  if (a0 <= FULL    && a1 >= FULL)     return '満月';
+  if (a0 <= FIRST_Q && a1 >= FIRST_Q) return '半月';
+  if (a0 <= LAST_Q  && a1 >= LAST_Q)  return '半月';
+
+  const noon = new Date(date); noon.setHours(12, 0, 0, 0);
+  const na   = getMoonAge(noon);
+  if (na >= 2.0 && na < 4.5) return '三日月';
+
+  return '';
+}
+
+// 日単位の月名判定：満月・新月はその日内にピークが来るかで検出する
+// 月齢の範囲ルックアップだと「何日も満月」になるため
+function getMoonNameForDay(date) {
+  const start = new Date(date); start.setHours(0, 0, 0, 0);
+  const end   = new Date(date); end.setHours(23, 59, 59, 0);
+  const a0 = getMoonAge(start);
+  const a1 = getMoonAge(end);
+  const FULL = SYNODIC_PERIOD / 2; // ≈ 14.765
+
+  // 満月ピーク：この暦日に望(月齢14.765)が含まれるか
+  if (a1 > a0 && a0 <= FULL && a1 >= FULL) {
+    return { name: '満月', reading: 'まんげつ' };
+  }
+  // 新月ピーク：月齢がリセット(~29.5→0)する日
+  if (a1 < a0) {
+    return { name: '新月', reading: 'しんげつ' };
+  }
+  // その他：正午の月齢で判定（日の途中の変動を避けるため）
+  const noon = new Date(date); noon.setHours(12, 0, 0, 0);
+  return getMoonName(getMoonAge(noon));
+}
+
+// SVG月相描画
+// 外縁弧（明側）+ 終端楕円弧（明暗境界）の2弧で満ち欠けを表現
+function moonSVG(age, size) {
+  size = size || 36;
+  const phase       = age / SYNODIC_PERIOD;        // 0=新月 0.5=満月
+  const r           = size / 2 - 2;
+  const cx          = size / 2;
+  const cy          = size / 2;
+  const brightColor = '#ede7c0';
+  const darkColor   = '#2a2540';
+  const border      = 'rgba(100,70,30,0.15)';
+
+  const baseCircle = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${darkColor}" stroke="${border}" stroke-width="0.5"/>`;
+
+  if (phase < 0.02 || phase > 0.98) {
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${baseCircle}</svg>`;
+  }
+  if (phase > 0.48 && phase < 0.52) {
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="${brightColor}" stroke="${border}" stroke-width="0.5"/>
+    </svg>`;
+  }
+
+  const waxing = phase < 0.5;
+  // SVGのsweep=1が時計回り(画面座標)
+  // 上→下: sweep=1が右側弧, sweep=0が左側弧
+  // 下→上: sweep=1が左側弧, sweep=0が右側弧
+  const outerSweep      = waxing ? 1 : 0;
+  // 三日月: 外縁と同側にすると細い弦月, 上弦後: 反対側にすると大きい凸月
+  const terminatorSweep = waxing ? (phase > 0.25 ? 1 : 0) : (phase > 0.75 ? 1 : 0);
+  const terminatorRx    = Math.abs(r * Math.cos(phase * 2 * Math.PI));
+
+  const path = `M ${cx},${cy - r} A ${r},${r} 0 0,${outerSweep} ${cx},${cy + r} A ${terminatorRx},${r} 0 0,${terminatorSweep} ${cx},${cy - r}`;
+
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    ${baseCircle}
+    <path d="${path}" fill="${brightColor}"/>
+  </svg>`;
+}
+
+function getWeekDays(date) {
+  const dow          = date.getDay();                   // 0=日曜
+  const mondayOffset = dow === 0 ? -6 : 1 - dow;
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(date);
+    d.setDate(date.getDate() + mondayOffset + i);
+    return d;
+  });
+}
+
+function renderMoon(today) {
+  const days = getWeekDays(today);
+  const DOW  = ['月', '火', '水', '木', '金', '土', '日'];
+
+  const gridHTML = days.map((d, i) => {
+    const isToday = d.toDateString() === today.toDateString();
+    const noon    = new Date(d); noon.setHours(12, 0, 0, 0);
+    const svgAge  = getMoonAge(noon);
+    const label   = getMoonPhaseLabel(d);
+    return `<div class="moon-day${isToday ? ' today' : ''}">
+      <span class="moon-dow">${DOW[i]}</span>
+      <span class="moon-date">${d.getDate()}</span>
+      <div class="moon-icon">${moonSVG(svgAge, 36)}</div>
+      <span class="moon-phase-label">${label}</span>
+    </div>`;
+  }).join('');
+
+  document.getElementById('moon-content').innerHTML =
+    `<div class="moon-week">${gridHTML}</div>`;
+}
+
+// =============================================
 //  初期化
 // =============================================
 function init() {
@@ -461,6 +613,8 @@ function init() {
 
   const kigo = pickDailyKigo(today);
   renderKigo(kigo);
+
+  renderMoon(today);
 }
 
 document.addEventListener('DOMContentLoaded', init);
